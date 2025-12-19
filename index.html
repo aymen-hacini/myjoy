@@ -12,18 +12,27 @@ html,body{
   overflow:hidden;
   touch-action:none;
   background:black;
-  font-family:system-ui,sans-serif;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
 }
 canvas{display:block}
 
+/* MODERN SCORE UI */
 #ui{
   position:absolute;
-  top:10px;
-  width:100%;
-  text-align:center;
+  top:16px;
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(255,255,255,0.2);
+  backdrop-filter:blur(10px);
+  padding:10px 20px;
+  border-radius:30px;
   color:white;
-  font-size:18px;
-  text-shadow:0 2px 5px rgba(0,0,0,.5);
+  font-size:22px;
+  font-weight:800;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  box-shadow:0 8px 20px rgba(0,0,0,.25);
   pointer-events:none;
 }
 
@@ -54,7 +63,7 @@ button{
 <body>
 
 <canvas id="game"></canvas>
-<div id="ui">Score ❤️ <span id="score">0</span></div>
+<div id="ui">❤️ <span id="score">0</span></div>
 
 <div id="start" class="overlay">
   <h1>🎂 Happy Birthday ❤️</h1>
@@ -82,85 +91,56 @@ const ctx=canvas.getContext("2d");
 function resize(){canvas.width=innerWidth;canvas.height=innerHeight}
 resize();addEventListener("resize",resize);
 
-/* ================= BACKGROUND IMAGE ================= */
+/* ================= BACKGROUND ================= */
 const bgImg=new Image();
-bgImg.src="bg.jpg";
+bgImg.src="bg.png";
 
 /* ================= STATE ================= */
-let playing=false,paused=false,score=0;
+let playing=false,paused=false,score=0,shake=0;
 const lanes=[-0.28,0,0.28];
 let lanePos=1,targetLane=1;
 
-const player={
-  y:0,vy:0,
-  baseSize:60,
-  sliding:false,
-  slideTimer:0,
-  blink:0,blinkTimer:0,
-  wave:0
-};
-
+const player={y:0,vy:0,baseSize:60,sliding:false,slideTimer:0,wave:0};
 const gravity=0.9,speed=7;
-const items=[];
-const messages={
-  20:"You make everything brighter 🌸",
-  50:"So lucky to have you 💕",
-  80:"Almost there 🎂"
-};
+const items=[],particles=[],confetti=[];
 
 /* ================= AUDIO ================= */
 const bgm=document.getElementById("bgm");
 bgm.volume=0.3;
 
-/* ================= SPAWN LOGIC ================= */
+/* ================= SPAWN ================= */
 function spawnItem(){
   const r=Math.random();
   let type="heart";
-  if(r>0.7) type="flower";
-  if(r>0.85) type="ring";
-  if(r>0.95) type="bomb";
+  if(r>0.7)type="flower";
+  if(r>0.85)type="ring";
+  if(r>0.95)type="bomb";
   items.push({lane:Math.floor(Math.random()*3),y:-40,type});
 }
 setInterval(()=>{if(playing&&!paused)spawnItem()},900);
 
 /* ================= DRAW KITTY ================= */
 function drawKitty(x,y){
-  player.blinkTimer++;
-  if(player.blinkTimer>180){player.blink=10;player.blinkTimer=0}
-  if(player.blink>0)player.blink--;
-
   ctx.save();
   ctx.translate(x,y);
+  ctx.scale(1,player.sliding?0.6:1);
 
-  // Slide squash
-  const scaleY=player.sliding?0.6:1;
-  ctx.scale(1,scaleY);
-
-  // Head
   ctx.fillStyle="white";
   ctx.beginPath();
   ctx.arc(0,0,player.baseSize/2,0,Math.PI*2);
   ctx.fill();
 
-  // Eyes
   ctx.fillStyle="black";
   ctx.beginPath();
-  if(player.blink===0){
-    ctx.arc(-10,-5,4,0,Math.PI*2);
-    ctx.arc(10,-5,4,0,Math.PI*2);
-  }else{
-    ctx.rect(-14,-5,8,2);
-    ctx.rect(6,-5,8,2);
-  }
+  ctx.arc(-10,-5,4,0,Math.PI*2);
+  ctx.arc(10,-5,4,0,Math.PI*2);
   ctx.fill();
 
-  // Nose
   ctx.fillStyle="gold";
   ctx.beginPath();
   ctx.arc(0,3,4,0,Math.PI*2);
   ctx.fill();
 
-  // Whiskers
   ctx.strokeStyle="black";
   [-1,1].forEach(d=>{
     ctx.beginPath();
@@ -169,33 +149,59 @@ function drawKitty(x,y){
     ctx.stroke();
   });
 
-  // Bow
   ctx.fillStyle="#ff2f92";
   ctx.beginPath();
   ctx.arc(14,-18,8,0,Math.PI*2);
   ctx.arc(24,-18,8,0,Math.PI*2);
   ctx.fill();
 
-  // Wave paw
   if(player.wave>0){
     ctx.strokeStyle="white";
-    ctx.lineWidth=5;
+    ctx.lineWidth=4;
     ctx.beginPath();
     ctx.arc(22,10,10,Math.PI*1.2,Math.PI*1.8);
     ctx.stroke();
     player.wave--;
   }
-
   ctx.restore();
 }
 
-/* ================= GAME LOOP ================= */
+/* ================= EXPLOSION ================= */
+function bombExplosion(x,y){
+  shake=15;
+  for(let i=0;i<30;i++){
+    particles.push({
+      x,y,
+      vx:(Math.random()-.5)*8,
+      vy:(Math.random()-.5)*8,
+      life:30
+    });
+  }
+}
+
+/* ================= LOOP ================= */
 function loop(){
   if(!playing)return;
   requestAnimationFrame(loop);
   if(paused)return;
 
-  ctx.drawImage(bgImg,0,0,canvas.width,canvas.height);
+  if(shake>0){shake--;}
+  ctx.save();
+  ctx.translate(
+    shake?Math.random()*6-3:0,
+    shake?Math.random()*6-3:0
+  );
+
+  // BG cover
+  const imgRatio=bgImg.width/bgImg.height;
+  const scrRatio=canvas.width/canvas.height;
+  let w,h;
+  if(imgRatio>scrRatio){
+    h=canvas.height; w=h*imgRatio;
+  }else{
+    w=canvas.width; h=w/imgRatio;
+  }
+  ctx.drawImage(bgImg,(canvas.width-w)/2,(canvas.height-h)/2,w,h);
 
   ctx.fillStyle="#fff";
   ctx.fillRect(0,canvas.height-90,canvas.width,90);
@@ -220,43 +226,57 @@ function loop(){
   items.forEach((it,i)=>{
     it.y+=speed;
     const ix=canvas.width/2+lanes[it.lane]*canvas.width;
-
     ctx.font="32px serif";
-    const icon={
-      heart:"❤️",
-      flower:"🌸",
-      ring:"💎",
-      bomb:"💣"
-    }[it.type];
-    ctx.fillText(icon,ix-16,it.y);
+    ctx.fillText(
+      {heart:"❤️",flower:"🌸",ring:"💎",bomb:"💣"}[it.type],
+      ix-16,it.y
+    );
 
     const hitY=player.sliding?30:50;
     if(it.lane===Math.round(lanePos)&&it.y>player.y-hitY&&it.y<player.y+40){
       items.splice(i,1);
-      let delta=0;
-      if(it.type==="heart")delta=1;
-      if(it.type==="flower")delta=2;
-      if(it.type==="ring")delta=3;
-      if(it.type==="bomb")delta=-3;
-
+      let delta={heart:1,flower:2,ring:3,bomb:-3}[it.type];
       score=Math.max(0,score+delta);
       scoreEl.textContent=score;
 
-      if(delta>0)player.wave=20;
-      navigator.vibrate?.(delta>0?30:80);
+      if(delta>0){player.wave=20;}
+      else{bombExplosion(ix,it.y);}
 
-      if(messages[score])showMessage(messages[score]);
+      navigator.vibrate?.(delta>0?30:120);
       if(score>=100)endGame();
     }
   });
+
+  particles.forEach((p,i)=>{
+    p.x+=p.vx; p.y+=p.vy; p.life--;
+    ctx.fillStyle="orange";
+    ctx.fillRect(p.x,p.y,4,4);
+    if(p.life<=0)particles.splice(i,1);
+  });
+
+  ctx.restore();
 }
 
-/* ================= POPUPS ================= */
-function showMessage(t){
-  paused=true;
-  bgm.pause();
-  msgText.textContent=t;
-  messageBox.style.display="flex";
+/* ================= END CONFETTI ================= */
+function confettiLoop(){
+  if(!end.style.display)return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  confetti.forEach(c=>{
+    c.y+=c.vy;
+    ctx.fillStyle=c.c;
+    ctx.fillRect(c.x,c.y,6,6);
+    if(c.y>canvas.height)c.y=-10;
+  });
+  requestAnimationFrame(confettiLoop);
+}
+
+/* ================= FLOW ================= */
+function startGame(){
+  start.style.display="none";
+  player.y=canvas.height-150;
+  playing=true;
+  bgm.play().catch(()=>{});
+  loop();
 }
 function resumeGame(){
   paused=false;
@@ -267,15 +287,15 @@ function endGame(){
   playing=false;
   bgm.pause();
   end.style.display="flex";
-}
-
-/* ================= START ================= */
-function startGame(){
-  start.style.display="none";
-  player.y=canvas.height-150;
-  playing=true;
-  bgm.play().catch(()=>{});
-  loop();
+  for(let i=0;i<100;i++){
+    confetti.push({
+      x:Math.random()*canvas.width,
+      y:Math.random()*canvas.height,
+      vy:2+Math.random()*3,
+      c:`hsl(${Math.random()*360},100%,70%)`
+    });
+  }
+  confettiLoop();
 }
 
 /* ================= TOUCH ================= */
@@ -287,14 +307,11 @@ addEventListener("touchstart",e=>{
 addEventListener("touchend",e=>{
   const dx=e.changedTouches[0].clientX-sx;
   const dy=e.changedTouches[0].clientY-sy;
-
   if(Math.abs(dx)>Math.abs(dy)){
     if(dx>40&&targetLane<2)targetLane++;
     if(dx<-40&&targetLane>0)targetLane--;
   }else{
-    if(dy<-40&&player.vy===0){
-      player.vy=-18;
-    }
+    if(dy<-40&&player.vy===0)player.vy=-18;
     if(dy>40&&!player.sliding){
       player.sliding=true;
       player.slideTimer=25;
