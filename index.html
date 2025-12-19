@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport"
-  content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Happy Birthday ❤️</title>
 
 <style>
@@ -11,36 +11,34 @@ html, body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: #ffd6e7;
+  background: #cceeff;
   touch-action: none;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: system-ui, sans-serif;
 }
 
-canvas {
-  display: block;
-}
+canvas { display: block; }
 
 #ui {
   position: absolute;
-  top: 12px;
+  top: 10px;
   width: 100%;
   text-align: center;
   font-size: 18px;
   color: white;
-  text-shadow: 0 2px 6px rgba(0,0,0,.4);
+  text-shadow: 0 2px 5px rgba(0,0,0,.4);
   pointer-events: none;
 }
 
 .overlay {
   position: absolute;
   inset: 0;
-  background: rgba(255,105,180,0.95);
+  background: rgba(255,182,193,.95);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  text-align: center;
   color: white;
+  text-align: center;
 }
 
 button {
@@ -48,9 +46,9 @@ button {
   border-radius: 30px;
   border: none;
   font-size: 18px;
-  margin-top: 20px;
   background: white;
   color: #ff2f92;
+  margin-top: 20px;
 }
 </style>
 </head>
@@ -72,238 +70,232 @@ button {
   <button onclick="resumeGame()">Resume</button>
 </div>
 
+<div id="end" class="overlay" style="display:none">
+  <h1>🎉 Happy Birthday Aisha 🎉</h1>
+  <p>100 hearts, all for you ❤️</p>
+  <button onclick="location.reload()">Play Again</button>
+</div>
+
+<audio id="bgm" src="music.mp3" loop></audio>
+
 <script>
-/* ================= CANVAS ================= */
+/* ================= SETUP ================= */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-
 function resize() {
   canvas.width = innerWidth;
   canvas.height = innerHeight;
 }
-resize();
-addEventListener("resize", resize);
+resize(); addEventListener("resize", resize);
 
 /* ================= GAME STATE ================= */
-let playing = false;
-let paused = false;
-let score = 0;
-
-const lanes = [-0.25, 0, 0.25];
-let currentLane = 1;
+let playing=false, paused=false, score=0;
+const laneX = [-0.28, 0, 0.28];
+let currentLane=1, targetLane=1, lanePos=1;
 
 const player = {
-  y: 0,
-  vy: 0,
-  size: 60,
-  jumping: false,
-  sliding: false
+  y: 0, vy: 0, size: 60, jumping:false
 };
 
-const gravity = 0.9;
-const speed = 7;
-
-const hearts = [];
-const confetti = [];
+const gravity=0.9, speed=7;
+const hearts=[], confetti=[];
 
 /* ================= MESSAGES ================= */
 const messages = {
-  5: "You make my days happier ❤️",
-  15: "I smile because of you 💕",
-  30: "Today is your day 🎂",
-  50: "Happy Birthday ❤️"
+  10: "You make everything beautiful 🌸",
+  30: "I’m so grateful for you 💕",
+  60: "You deserve all the love ❤️",
+  90: "Almost there 🎂"
 };
 
-/* ================= AUDIO ================= */
-let audioCtx;
-let musicGain;
+/* ================= BACKGROUND ================= */
+let bgOffset = 0;
+function drawGarden() {
+  // Sky
+  ctx.fillStyle = "#aee7ff";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 
-function initAudio() {
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  musicGain = audioCtx.createGain();
-  musicGain.gain.value = 0.05;
-  musicGain.connect(audioCtx.destination);
+  // Hills
+  ctx.fillStyle = "#7ed957";
+  ctx.beginPath();
+  ctx.arc(canvas.width*0.2, canvas.height, 400, Math.PI, 0);
+  ctx.arc(canvas.width*0.7, canvas.height, 500, Math.PI, 0);
+  ctx.fill();
 
-  const osc = audioCtx.createOscillator();
-  osc.type = "sine";
-  osc.frequency.value = 220;
-  osc.connect(musicGain);
-  osc.start();
+  // Flowers
+  for (let i=0;i<20;i++) {
+    const x = (i*120 + bgOffset)%canvas.width;
+    const y = canvas.height-90;
+    ctx.fillStyle="#ff69b4";
+    ctx.beginPath();
+    ctx.arc(x,y,5,0,Math.PI*2);
+    ctx.fill();
+  }
 }
 
+/* ================= AUDIO ================= */
+const bgm = document.getElementById("bgm");
+bgm.volume = 0.25;
+
 function popupSound() {
-  const o = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-  o.frequency.value = 880;
-  g.gain.value = 0.2;
-  o.connect(g).connect(audioCtx.destination);
-  o.start();
-  o.stop(audioCtx.currentTime + 0.15);
+  const o = new AudioContext();
+  const osc = o.createOscillator();
+  const g = o.createGain();
+  osc.frequency.value = 900;
+  g.gain.value = 0.15;
+  osc.connect(g).connect(o.destination);
+  osc.start();
+  osc.stop(o.currentTime+0.15);
 }
 
 /* ================= CONFETTI ================= */
 function spawnConfetti() {
-  for (let i = 0; i < 60; i++) {
+  for(let i=0;i<80;i++){
     confetti.push({
-      x: Math.random() * canvas.width,
-      y: -20,
-      vx: (Math.random() - 0.5) * 6,
-      vy: Math.random() * 6 + 2,
-      color: `hsl(${Math.random()*360},100%,70%)`
+      x:Math.random()*canvas.width,
+      y:-10,
+      vx:(Math.random()-.5)*6,
+      vy:Math.random()*6+2,
+      c:`hsl(${Math.random()*360},100%,70%)`
     });
   }
 }
 
-/* ================= PLAYER DRAW ================= */
-function drawHelloKitty(x, y, size) {
+/* ================= CHARACTER ================= */
+function drawKitty(x,y,s){
   ctx.save();
-  ctx.translate(x, y);
-
-  // Head
-  ctx.fillStyle = "white";
+  ctx.translate(x,y);
+  ctx.fillStyle="white";
   ctx.beginPath();
-  ctx.arc(0, 0, size/2, 0, Math.PI*2);
+  ctx.arc(0,0,s/2,0,Math.PI*2); ctx.fill();
+
+  ctx.fillStyle="black";
+  ctx.beginPath();
+  ctx.arc(-10,-5,4,0,Math.PI*2);
+  ctx.arc(10,-5,4,0,Math.PI*2);
   ctx.fill();
 
-  // Eyes
-  ctx.fillStyle = "black";
+  ctx.fillStyle="gold";
   ctx.beginPath();
-  ctx.arc(-10, -5, 4, 0, Math.PI*2);
-  ctx.arc(10, -5, 4, 0, Math.PI*2);
-  ctx.fill();
+  ctx.arc(0,3,4,0,Math.PI*2); ctx.fill();
 
-  // Nose
-  ctx.fillStyle = "gold";
-  ctx.beginPath();
-  ctx.arc(0, 2, 4, 0, Math.PI*2);
-  ctx.fill();
-
-  // Whiskers
-  ctx.strokeStyle = "black";
-  [-1,1].forEach(s=>{
+  ctx.strokeStyle="black";
+  [-1,1].forEach(d=>{
     ctx.beginPath();
-    ctx.moveTo(s*8, 4);
-    ctx.lineTo(s*20, 0);
-    ctx.moveTo(s*8, 8);
-    ctx.lineTo(s*20, 8);
+    ctx.moveTo(d*8,6); ctx.lineTo(d*20,2);
+    ctx.moveTo(d*8,10); ctx.lineTo(d*20,10);
     ctx.stroke();
   });
 
-  // Bow
-  ctx.fillStyle = "#ff2f92";
+  ctx.fillStyle="#ff2f92";
   ctx.beginPath();
-  ctx.arc(14, -18, 8, 0, Math.PI*2);
-  ctx.arc(24, -18, 8, 0, Math.PI*2);
+  ctx.arc(14,-18,8,0,Math.PI*2);
+  ctx.arc(24,-18,8,0,Math.PI*2);
   ctx.fill();
-
   ctx.restore();
 }
 
 /* ================= GAME LOOP ================= */
-function spawnHeart() {
-  hearts.push({ lane: Math.floor(Math.random()*3), y: -30 });
+function spawnHeart(){
+  hearts.push({lane:Math.floor(Math.random()*3),y:-30});
 }
+setInterval(()=>{ if(playing&&!paused)spawnHeart(); },900);
 
-setInterval(() => {
-  if (playing && !paused) spawnHeart();
-}, 900);
-
-function loop() {
-  if (!playing) return;
+function loop(){
+  if(!playing) return;
   requestAnimationFrame(loop);
-  if (paused) return;
+  if(paused) return;
 
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+  bgOffset+=1;
+  drawGarden();
 
-  // Ground
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, canvas.height-90, canvas.width, 90);
+  ctx.fillStyle="#fff";
+  ctx.fillRect(0,canvas.height-90,canvas.width,90);
 
-  // Player physics
-  player.vy += gravity;
-  player.y += player.vy;
-  if (player.y > canvas.height-150) {
-    player.y = canvas.height-150;
-    player.vy = 0;
-    player.jumping = false;
+  // Smooth lane movement
+  lanePos += (targetLane - lanePos)*0.15;
+  const px = canvas.width/2 + laneX[Math.round(lanePos)]*canvas.width;
+
+  player.vy+=gravity;
+  player.y+=player.vy;
+  if(player.y>canvas.height-150){
+    player.y=canvas.height-150;
+    player.vy=0; player.jumping=false;
   }
 
-  const px = canvas.width/2 + lanes[currentLane]*canvas.width;
-  drawHelloKitty(px, player.y, player.size);
+  drawKitty(px,player.y,player.size);
 
-  // Hearts
   hearts.forEach((h,i)=>{
-    h.y += speed;
-    const hx = canvas.width/2 + lanes[h.lane]*canvas.width;
-    ctx.font = "32px serif";
-    ctx.fillText("❤️", hx-16, h.y);
+    h.y+=speed;
+    const hx = canvas.width/2 + laneX[h.lane]*canvas.width;
+    ctx.font="32px serif";
+    ctx.fillText("❤️",hx-16,h.y);
 
-    if (h.lane === currentLane &&
-        h.y > player.y-20 &&
-        h.y < player.y+40) {
+    if(h.lane===Math.round(lanePos)&&h.y>player.y-20&&h.y<player.y+40){
       hearts.splice(i,1);
       score++;
-      document.getElementById("score").textContent = score;
-      if (messages[score]) showMessage(messages[score]);
-      navigator.vibrate?.(40);
+      scoreEl.textContent=score;
+      if(messages[score]) showMessage(messages[score]);
+      if(score>=100) endGame();
+      navigator.vibrate?.(30);
     }
   });
 
-  // Confetti
   confetti.forEach((c,i)=>{
-    c.x += c.vx;
-    c.y += c.vy;
-    ctx.fillStyle = c.color;
-    ctx.fillRect(c.x, c.y, 6, 6);
-    if (c.y > canvas.height) confetti.splice(i,1);
+    c.x+=c.vx; c.y+=c.vy;
+    ctx.fillStyle=c.c;
+    ctx.fillRect(c.x,c.y,6,6);
+    if(c.y>canvas.height) confetti.splice(i,1);
   });
 }
 
-/* ================= MESSAGE POPUP ================= */
-function showMessage(text) {
-  paused = true;
+const scoreEl=document.getElementById("score");
+
+/* ================= POPUPS ================= */
+function showMessage(t){
+  paused=true;
+  bgm.pause();
   spawnConfetti();
   popupSound();
-  document.getElementById("msgText").textContent = text;
-  document.getElementById("messageBox").style.display = "flex";
+  msgText.textContent=t;
+  messageBox.style.display="flex";
 }
 
-function resumeGame() {
-  paused = false;
-  document.getElementById("messageBox").style.display = "none";
+function resumeGame(){
+  paused=false;
+  bgm.play();
+  messageBox.style.display="none";
+}
+
+function endGame(){
+  playing=false;
+  bgm.pause();
+  end.style.display="flex";
 }
 
 /* ================= START ================= */
-function startGame() {
-  document.getElementById("start").style.display = "none";
-  initAudio();
-  player.y = canvas.height-150;
-  playing = true;
+function startGame(){
+  start.style.display="none";
+  player.y=canvas.height-150;
+  playing=true;
+  bgm.play();
   loop();
 }
 
-/* ================= TOUCH CONTROLS ================= */
-let sx=0, sy=0;
-addEventListener("touchstart", e=>{
-  sx = e.touches[0].clientX;
-  sy = e.touches[0].clientY;
+/* ================= TOUCH ================= */
+let sx=0,sy=0;
+addEventListener("touchstart",e=>{
+  sx=e.touches[0].clientX;
+  sy=e.touches[0].clientY;
 });
-addEventListener("touchend", e=>{
-  const dx = e.changedTouches[0].clientX - sx;
-  const dy = e.changedTouches[0].clientY - sy;
-
-  if (Math.abs(dx) > Math.abs(dy)) {
-    if (dx>40 && currentLane<2) currentLane++;
-    if (dx<-40 && currentLane>0) currentLane--;
-  } else {
-    if (dy<-40 && !player.jumping) {
-      player.vy = -18;
-      player.jumping = true;
-    }
-    if (dy>40) {
-      player.sliding = true;
-      setTimeout(()=>player.sliding=false,500);
-    }
+addEventListener("touchend",e=>{
+  const dx=e.changedTouches[0].clientX-sx;
+  const dy=e.changedTouches[0].clientY-sy;
+  if(Math.abs(dx)>Math.abs(dy)){
+    if(dx>40&&targetLane<2)targetLane++;
+    if(dx<-40&&targetLane>0)targetLane--;
+  } else if(dy<-40&&!player.jumping){
+    player.vy=-18; player.jumping=true;
   }
 });
 </script>
