@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Happy Birthday ❤️</title>
+<title>❤️ عيد ميلاد سعيد ❤️</title>
 
 <style>
 html,body{
@@ -66,8 +66,7 @@ button{
 <div id="ui">❤️ <span id="score">0</span></div>
 
 <div id="start" class="overlay">
-  <h1>🎂 Happy Birthday ❤️</h1>
-  <p>Swipe to play</p>
+  <h1>🎂 عيد ميلاد سعيد ❤️</h1
   <button onclick="startGame()">Start</button>
 </div>
 
@@ -77,8 +76,7 @@ button{
 </div>
 
 <div id="end" class="overlay" style="display:none">
-  <h1>🎉 Happy Birthday Aisha 🎉</h1>
-  <p>100 points, all for you ❤️</p>
+  <h1>🎉كل عام وأنتِ فرح أيامي، وأتمنى يومًا أن أقول لكِ بكل يقين: اخترتك شريكة حياتي، واختيار القلب لا يخطئ. 🎉</h1>
   <button onclick="location.reload()">Play Again</button>
 </div>
 
@@ -93,7 +91,7 @@ resize();addEventListener("resize",resize);
 
 /* ================= BACKGROUND ================= */
 const bgImg=new Image();
-bgImg.src="bg.png";
+bgImg.src="bg.jpg";
 
 /* ================= STATE ================= */
 let playing=false,paused=false,score=0,shake=0;
@@ -324,3 +322,4 @@ const scoreEl=document.getElementById("score");
 
 </body>
 </html>
+
