@@ -15,40 +15,39 @@ html, body {
   touch-action: none;
   font-family: system-ui, sans-serif;
 }
-
-canvas { display: block; }
+canvas { display:block; }
 
 #ui {
-  position: absolute;
-  top: 10px;
-  width: 100%;
-  text-align: center;
-  font-size: 18px;
-  color: white;
-  text-shadow: 0 2px 5px rgba(0,0,0,.4);
-  pointer-events: none;
+  position:absolute;
+  top:10px;
+  width:100%;
+  text-align:center;
+  color:white;
+  font-size:18px;
+  text-shadow:0 2px 5px rgba(0,0,0,.4);
+  pointer-events:none;
 }
 
 .overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(255,182,193,.95);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  text-align: center;
+  position:absolute;
+  inset:0;
+  background:rgba(255,182,193,.95);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  color:white;
 }
 
 button {
-  padding: 14px 28px;
-  border-radius: 30px;
-  border: none;
-  font-size: 18px;
-  background: white;
-  color: #ff2f92;
-  margin-top: 20px;
+  padding:14px 28px;
+  border:none;
+  border-radius:30px;
+  font-size:18px;
+  background:white;
+  color:#ff2f92;
+  margin-top:20px;
 }
 </style>
 </head>
@@ -56,7 +55,6 @@ button {
 <body>
 
 <canvas id="game"></canvas>
-
 <div id="ui">❤️ Hearts: <span id="score">0</span></div>
 
 <div id="start" class="overlay">
@@ -76,108 +74,116 @@ button {
   <button onclick="location.reload()">Play Again</button>
 </div>
 
-<audio id="bgm" src="music.mp3" loop></audio>
+<!-- REAL MUSIC -->
+<audio id="bgm" src="music.mp3" loop preload="auto" playsinline></audio>
 
 <script>
 /* ================= SETUP ================= */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-function resize() {
-  canvas.width = innerWidth;
-  canvas.height = innerHeight;
-}
-resize(); addEventListener("resize", resize);
+function resize(){ canvas.width=innerWidth; canvas.height=innerHeight; }
+resize(); addEventListener("resize",resize);
 
-/* ================= GAME STATE ================= */
+/* ================= STATE ================= */
 let playing=false, paused=false, score=0;
-const laneX = [-0.28, 0, 0.28];
-let currentLane=1, targetLane=1, lanePos=1;
+const lanes=[-0.28,0,0.28];
+let lanePos=1, targetLane=1;
 
-const player = {
-  y: 0, vy: 0, size: 60, jumping:false
+const player={
+  y:0, vy:0, baseSize:60,
+  blink:0, blinkTimer:0,
+  squash:1
 };
 
 const gravity=0.9, speed=7;
 const hearts=[], confetti=[];
+const flowers=[];
+let bgOffset=0;
 
 /* ================= MESSAGES ================= */
-const messages = {
-  10: "You make everything beautiful 🌸",
-  30: "I’m so grateful for you 💕",
-  60: "You deserve all the love ❤️",
-  90: "Almost there 🎂"
+const messages={
+  10:"You make everything beautiful 🌸",
+  30:"I’m so grateful for you 💕",
+  60:"You deserve all the love ❤️",
+  90:"Almost there 🎂"
 };
 
-/* ================= BACKGROUND ================= */
-let bgOffset = 0;
-function drawGarden() {
-  // Sky
-  ctx.fillStyle = "#aee7ff";
+/* ================= FLOWERS ================= */
+for(let i=0;i<25;i++){
+  flowers.push({
+    x:Math.random()*canvas.width,
+    sway:Math.random()*Math.PI*2,
+    size:6+Math.random()*6,
+    color:`hsl(${Math.random()*360},80%,70%)`
+  });
+}
+
+/* ================= AUDIO FIX ================= */
+const bgm=document.getElementById("bgm");
+bgm.volume=0.3;
+
+/* ================= DRAW BACKGROUND ================= */
+function drawGarden(){
+  ctx.fillStyle="#aee7ff";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  // Hills
-  ctx.fillStyle = "#7ed957";
+  ctx.fillStyle="#7ed957";
   ctx.beginPath();
-  ctx.arc(canvas.width*0.2, canvas.height, 400, Math.PI, 0);
-  ctx.arc(canvas.width*0.7, canvas.height, 500, Math.PI, 0);
+  ctx.arc(canvas.width*0.2,canvas.height,400,Math.PI,0);
+  ctx.arc(canvas.width*0.7,canvas.height,500,Math.PI,0);
   ctx.fill();
 
-  // Flowers
-  for (let i=0;i<20;i++) {
-    const x = (i*120 + bgOffset)%canvas.width;
-    const y = canvas.height-90;
-    ctx.fillStyle="#ff69b4";
-    ctx.beginPath();
-    ctx.arc(x,y,5,0,Math.PI*2);
-    ctx.fill();
+  flowers.forEach((f,i)=>{
+    f.sway+=0.02;
+    const sway=Math.sin(f.sway)*5;
+    const y=canvas.height-90;
+    ctx.save();
+    ctx.translate((f.x+bgOffset)%canvas.width,y);
+    ctx.rotate(Math.sin(f.sway)*0.2);
+    ctx.fillStyle=f.color;
+    for(let p=0;p<5;p++){
+      ctx.rotate(Math.PI*2/5);
+      ctx.beginPath();
+      ctx.arc(0,f.size, f.size,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  });
+}
+
+/* ================= KITTY ================= */
+function drawKitty(x,y){
+  player.blinkTimer++;
+  if(player.blinkTimer>200){
+    player.blink=10;
+    player.blinkTimer=0;
   }
-}
+  if(player.blink>0) player.blink--;
 
-/* ================= AUDIO ================= */
-const bgm = document.getElementById("bgm");
-bgm.volume = 0.25;
-
-function popupSound() {
-  const o = new AudioContext();
-  const osc = o.createOscillator();
-  const g = o.createGain();
-  osc.frequency.value = 900;
-  g.gain.value = 0.15;
-  osc.connect(g).connect(o.destination);
-  osc.start();
-  osc.stop(o.currentTime+0.15);
-}
-
-/* ================= CONFETTI ================= */
-function spawnConfetti() {
-  for(let i=0;i<80;i++){
-    confetti.push({
-      x:Math.random()*canvas.width,
-      y:-10,
-      vx:(Math.random()-.5)*6,
-      vy:Math.random()*6+2,
-      c:`hsl(${Math.random()*360},100%,70%)`
-    });
-  }
-}
-
-/* ================= CHARACTER ================= */
-function drawKitty(x,y,s){
   ctx.save();
   ctx.translate(x,y);
+  ctx.scale(1,player.squash);
+
   ctx.fillStyle="white";
   ctx.beginPath();
-  ctx.arc(0,0,s/2,0,Math.PI*2); ctx.fill();
+  ctx.arc(0,0,player.baseSize/2,0,Math.PI*2);
+  ctx.fill();
 
   ctx.fillStyle="black";
   ctx.beginPath();
-  ctx.arc(-10,-5,4,0,Math.PI*2);
-  ctx.arc(10,-5,4,0,Math.PI*2);
+  if(player.blink===0){
+    ctx.arc(-10,-5,4,0,Math.PI*2);
+    ctx.arc(10,-5,4,0,Math.PI*2);
+  } else {
+    ctx.rect(-14,-5,8,2);
+    ctx.rect(6,-5,8,2);
+  }
   ctx.fill();
 
   ctx.fillStyle="gold";
   ctx.beginPath();
-  ctx.arc(0,3,4,0,Math.PI*2); ctx.fill();
+  ctx.arc(0,3,4,0,Math.PI*2);
+  ctx.fill();
 
   ctx.strokeStyle="black";
   [-1,1].forEach(d=>{
@@ -192,6 +198,7 @@ function drawKitty(x,y,s){
   ctx.arc(14,-18,8,0,Math.PI*2);
   ctx.arc(24,-18,8,0,Math.PI*2);
   ctx.fill();
+
   ctx.restore();
 }
 
@@ -212,22 +219,24 @@ function loop(){
   ctx.fillStyle="#fff";
   ctx.fillRect(0,canvas.height-90,canvas.width,90);
 
-  // Smooth lane movement
-  lanePos += (targetLane - lanePos)*0.15;
-  const px = canvas.width/2 + laneX[Math.round(lanePos)]*canvas.width;
+  lanePos+=(targetLane-lanePos)*0.12;
+  const px=canvas.width/2+lanes[Math.round(lanePos)]*canvas.width;
 
   player.vy+=gravity;
   player.y+=player.vy;
   if(player.y>canvas.height-150){
     player.y=canvas.height-150;
-    player.vy=0; player.jumping=false;
+    player.vy=0;
+    player.squash+= (1-player.squash)*0.2;
+  } else {
+    player.squash=0.9;
   }
 
-  drawKitty(px,player.y,player.size);
+  drawKitty(px,player.y);
 
   hearts.forEach((h,i)=>{
     h.y+=speed;
-    const hx = canvas.width/2 + laneX[h.lane]*canvas.width;
+    const hx=canvas.width/2+lanes[h.lane]*canvas.width;
     ctx.font="32px serif";
     ctx.fillText("❤️",hx-16,h.y);
 
@@ -240,30 +249,19 @@ function loop(){
       navigator.vibrate?.(30);
     }
   });
-
-  confetti.forEach((c,i)=>{
-    c.x+=c.vx; c.y+=c.vy;
-    ctx.fillStyle=c.c;
-    ctx.fillRect(c.x,c.y,6,6);
-    if(c.y>canvas.height) confetti.splice(i,1);
-  });
 }
-
-const scoreEl=document.getElementById("score");
 
 /* ================= POPUPS ================= */
 function showMessage(t){
   paused=true;
   bgm.pause();
-  spawnConfetti();
-  popupSound();
   msgText.textContent=t;
   messageBox.style.display="flex";
 }
 
 function resumeGame(){
   paused=false;
-  bgm.play();
+  bgm.play().catch(()=>{});
   messageBox.style.display="none";
 }
 
@@ -278,7 +276,7 @@ function startGame(){
   start.style.display="none";
   player.y=canvas.height-150;
   playing=true;
-  bgm.play();
+  bgm.play().catch(()=>{});
   loop();
 }
 
@@ -294,10 +292,13 @@ addEventListener("touchend",e=>{
   if(Math.abs(dx)>Math.abs(dy)){
     if(dx>40&&targetLane<2)targetLane++;
     if(dx<-40&&targetLane>0)targetLane--;
-  } else if(dy<-40&&!player.jumping){
-    player.vy=-18; player.jumping=true;
+  } else if(dy<-40&&player.vy===0){
+    player.vy=-18;
+    player.squash=1.1;
   }
 });
+
+const scoreEl=document.getElementById("score");
 </script>
 
 </body>
