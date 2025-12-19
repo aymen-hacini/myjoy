@@ -2,33 +2,32 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport"
-content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Happy Birthday ❤️</title>
 
 <style>
-html, body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  background: #cceeff;
-  touch-action: none;
-  font-family: system-ui, sans-serif;
+html,body{
+  margin:0;
+  padding:0;
+  overflow:hidden;
+  touch-action:none;
+  background:black;
+  font-family:system-ui,sans-serif;
 }
-canvas { display:block; }
+canvas{display:block}
 
-#ui {
+#ui{
   position:absolute;
   top:10px;
   width:100%;
   text-align:center;
   color:white;
   font-size:18px;
-  text-shadow:0 2px 5px rgba(0,0,0,.4);
+  text-shadow:0 2px 5px rgba(0,0,0,.5);
   pointer-events:none;
 }
 
-.overlay {
+.overlay{
   position:absolute;
   inset:0;
   background:rgba(255,182,193,.95);
@@ -36,11 +35,11 @@ canvas { display:block; }
   flex-direction:column;
   align-items:center;
   justify-content:center;
-  text-align:center;
   color:white;
+  text-align:center;
 }
 
-button {
+button{
   padding:14px 28px;
   border:none;
   border-radius:30px;
@@ -55,7 +54,7 @@ button {
 <body>
 
 <canvas id="game"></canvas>
-<div id="ui">❤️ Hearts: <span id="score">0</span></div>
+<div id="ui">Score ❤️ <span id="score">0</span></div>
 
 <div id="start" class="overlay">
   <h1>🎂 Happy Birthday ❤️</h1>
@@ -70,151 +69,133 @@ button {
 
 <div id="end" class="overlay" style="display:none">
   <h1>🎉 Happy Birthday Aisha 🎉</h1>
-  <p>100 hearts, all for you ❤️</p>
+  <p>100 points, all for you ❤️</p>
   <button onclick="location.reload()">Play Again</button>
 </div>
 
-<!-- REAL MUSIC -->
 <audio id="bgm" src="music.mp3" loop preload="auto" playsinline></audio>
 
 <script>
 /* ================= SETUP ================= */
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
-function resize(){ canvas.width=innerWidth; canvas.height=innerHeight; }
-resize(); addEventListener("resize",resize);
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+function resize(){canvas.width=innerWidth;canvas.height=innerHeight}
+resize();addEventListener("resize",resize);
+
+/* ================= BACKGROUND IMAGE ================= */
+const bgImg=new Image();
+bgImg.src="bg.jpg";
 
 /* ================= STATE ================= */
-let playing=false, paused=false, score=0;
+let playing=false,paused=false,score=0;
 const lanes=[-0.28,0,0.28];
-let lanePos=1, targetLane=1;
+let lanePos=1,targetLane=1;
 
 const player={
-  y:0, vy:0, baseSize:60,
-  blink:0, blinkTimer:0,
-  squash:1
+  y:0,vy:0,
+  baseSize:60,
+  sliding:false,
+  slideTimer:0,
+  blink:0,blinkTimer:0,
+  wave:0
 };
 
-const gravity=0.9, speed=7;
-const hearts=[], confetti=[];
-const flowers=[];
-let bgOffset=0;
-
-/* ================= MESSAGES ================= */
+const gravity=0.9,speed=7;
+const items=[];
 const messages={
-  10:"You make everything beautiful 🌸",
-  30:"I’m so grateful for you 💕",
-  60:"You deserve all the love ❤️",
-  90:"Almost there 🎂"
+  20:"You make everything brighter 🌸",
+  50:"So lucky to have you 💕",
+  80:"Almost there 🎂"
 };
 
-/* ================= FLOWERS ================= */
-for(let i=0;i<25;i++){
-  flowers.push({
-    x:Math.random()*canvas.width,
-    sway:Math.random()*Math.PI*2,
-    size:6+Math.random()*6,
-    color:`hsl(${Math.random()*360},80%,70%)`
-  });
-}
-
-/* ================= AUDIO FIX ================= */
+/* ================= AUDIO ================= */
 const bgm=document.getElementById("bgm");
 bgm.volume=0.3;
 
-/* ================= DRAW BACKGROUND ================= */
-function drawGarden(){
-  ctx.fillStyle="#aee7ff";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  ctx.fillStyle="#7ed957";
-  ctx.beginPath();
-  ctx.arc(canvas.width*0.2,canvas.height,400,Math.PI,0);
-  ctx.arc(canvas.width*0.7,canvas.height,500,Math.PI,0);
-  ctx.fill();
-
-  flowers.forEach((f,i)=>{
-    f.sway+=0.02;
-    const sway=Math.sin(f.sway)*5;
-    const y=canvas.height-90;
-    ctx.save();
-    ctx.translate((f.x+bgOffset)%canvas.width,y);
-    ctx.rotate(Math.sin(f.sway)*0.2);
-    ctx.fillStyle=f.color;
-    for(let p=0;p<5;p++){
-      ctx.rotate(Math.PI*2/5);
-      ctx.beginPath();
-      ctx.arc(0,f.size, f.size,0,Math.PI*2);
-      ctx.fill();
-    }
-    ctx.restore();
-  });
+/* ================= SPAWN LOGIC ================= */
+function spawnItem(){
+  const r=Math.random();
+  let type="heart";
+  if(r>0.7) type="flower";
+  if(r>0.85) type="ring";
+  if(r>0.95) type="bomb";
+  items.push({lane:Math.floor(Math.random()*3),y:-40,type});
 }
+setInterval(()=>{if(playing&&!paused)spawnItem()},900);
 
-/* ================= KITTY ================= */
+/* ================= DRAW KITTY ================= */
 function drawKitty(x,y){
   player.blinkTimer++;
-  if(player.blinkTimer>200){
-    player.blink=10;
-    player.blinkTimer=0;
-  }
-  if(player.blink>0) player.blink--;
+  if(player.blinkTimer>180){player.blink=10;player.blinkTimer=0}
+  if(player.blink>0)player.blink--;
 
   ctx.save();
   ctx.translate(x,y);
-  ctx.scale(1,player.squash);
 
+  // Slide squash
+  const scaleY=player.sliding?0.6:1;
+  ctx.scale(1,scaleY);
+
+  // Head
   ctx.fillStyle="white";
   ctx.beginPath();
   ctx.arc(0,0,player.baseSize/2,0,Math.PI*2);
   ctx.fill();
 
+  // Eyes
   ctx.fillStyle="black";
   ctx.beginPath();
   if(player.blink===0){
     ctx.arc(-10,-5,4,0,Math.PI*2);
     ctx.arc(10,-5,4,0,Math.PI*2);
-  } else {
+  }else{
     ctx.rect(-14,-5,8,2);
     ctx.rect(6,-5,8,2);
   }
   ctx.fill();
 
+  // Nose
   ctx.fillStyle="gold";
   ctx.beginPath();
   ctx.arc(0,3,4,0,Math.PI*2);
   ctx.fill();
 
+  // Whiskers
   ctx.strokeStyle="black";
   [-1,1].forEach(d=>{
     ctx.beginPath();
-    ctx.moveTo(d*8,6); ctx.lineTo(d*20,2);
-    ctx.moveTo(d*8,10); ctx.lineTo(d*20,10);
+    ctx.moveTo(d*8,6);ctx.lineTo(d*20,2);
+    ctx.moveTo(d*8,10);ctx.lineTo(d*20,10);
     ctx.stroke();
   });
 
+  // Bow
   ctx.fillStyle="#ff2f92";
   ctx.beginPath();
   ctx.arc(14,-18,8,0,Math.PI*2);
   ctx.arc(24,-18,8,0,Math.PI*2);
   ctx.fill();
 
+  // Wave paw
+  if(player.wave>0){
+    ctx.strokeStyle="white";
+    ctx.lineWidth=5;
+    ctx.beginPath();
+    ctx.arc(22,10,10,Math.PI*1.2,Math.PI*1.8);
+    ctx.stroke();
+    player.wave--;
+  }
+
   ctx.restore();
 }
 
 /* ================= GAME LOOP ================= */
-function spawnHeart(){
-  hearts.push({lane:Math.floor(Math.random()*3),y:-30});
-}
-setInterval(()=>{ if(playing&&!paused)spawnHeart(); },900);
-
 function loop(){
-  if(!playing) return;
+  if(!playing)return;
   requestAnimationFrame(loop);
-  if(paused) return;
+  if(paused)return;
 
-  bgOffset+=1;
-  drawGarden();
+  ctx.drawImage(bgImg,0,0,canvas.width,canvas.height);
 
   ctx.fillStyle="#fff";
   ctx.fillRect(0,canvas.height-90,canvas.width,90);
@@ -227,26 +208,45 @@ function loop(){
   if(player.y>canvas.height-150){
     player.y=canvas.height-150;
     player.vy=0;
-    player.squash+= (1-player.squash)*0.2;
-  } else {
-    player.squash=0.9;
+  }
+
+  if(player.sliding){
+    player.slideTimer--;
+    if(player.slideTimer<=0)player.sliding=false;
   }
 
   drawKitty(px,player.y);
 
-  hearts.forEach((h,i)=>{
-    h.y+=speed;
-    const hx=canvas.width/2+lanes[h.lane]*canvas.width;
-    ctx.font="32px serif";
-    ctx.fillText("❤️",hx-16,h.y);
+  items.forEach((it,i)=>{
+    it.y+=speed;
+    const ix=canvas.width/2+lanes[it.lane]*canvas.width;
 
-    if(h.lane===Math.round(lanePos)&&h.y>player.y-20&&h.y<player.y+40){
-      hearts.splice(i,1);
-      score++;
+    ctx.font="32px serif";
+    const icon={
+      heart:"❤️",
+      flower:"🌸",
+      ring:"💎",
+      bomb:"💣"
+    }[it.type];
+    ctx.fillText(icon,ix-16,it.y);
+
+    const hitY=player.sliding?30:50;
+    if(it.lane===Math.round(lanePos)&&it.y>player.y-hitY&&it.y<player.y+40){
+      items.splice(i,1);
+      let delta=0;
+      if(it.type==="heart")delta=1;
+      if(it.type==="flower")delta=2;
+      if(it.type==="ring")delta=3;
+      if(it.type==="bomb")delta=-3;
+
+      score=Math.max(0,score+delta);
       scoreEl.textContent=score;
-      if(messages[score]) showMessage(messages[score]);
-      if(score>=100) endGame();
-      navigator.vibrate?.(30);
+
+      if(delta>0)player.wave=20;
+      navigator.vibrate?.(delta>0?30:80);
+
+      if(messages[score])showMessage(messages[score]);
+      if(score>=100)endGame();
     }
   });
 }
@@ -258,13 +258,11 @@ function showMessage(t){
   msgText.textContent=t;
   messageBox.style.display="flex";
 }
-
 function resumeGame(){
   paused=false;
   bgm.play().catch(()=>{});
   messageBox.style.display="none";
 }
-
 function endGame(){
   playing=false;
   bgm.pause();
@@ -289,12 +287,18 @@ addEventListener("touchstart",e=>{
 addEventListener("touchend",e=>{
   const dx=e.changedTouches[0].clientX-sx;
   const dy=e.changedTouches[0].clientY-sy;
+
   if(Math.abs(dx)>Math.abs(dy)){
     if(dx>40&&targetLane<2)targetLane++;
     if(dx<-40&&targetLane>0)targetLane--;
-  } else if(dy<-40&&player.vy===0){
-    player.vy=-18;
-    player.squash=1.1;
+  }else{
+    if(dy<-40&&player.vy===0){
+      player.vy=-18;
+    }
+    if(dy>40&&!player.sliding){
+      player.sliding=true;
+      player.slideTimer=25;
+    }
   }
 });
 
