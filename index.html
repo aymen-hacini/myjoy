@@ -1,114 +1,100 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>❤️ عيد ميلاد سعيد ❤️</title>
-
+<title>عيد ميلاد سعيد فرح ❤️</title>
 <style>
-html,body{
-  margin:0;
-  padding:0;
-  overflow:hidden;
-  touch-action:none;
-  background:black;
-  font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
-}
-canvas{display:block}
-
-/* MODERN SCORE UI */
+html,body{margin:0;padding:0;overflow:hidden;font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;}
+canvas{display:block;}
 #ui{
-  position:absolute;
-  top:16px;
-  left:50%;
-  transform:translateX(-50%);
-  background:rgba(255,255,255,0.2);
-  backdrop-filter:blur(10px);
-  padding:10px 20px;
-  border-radius:30px;
-  color:white;
-  font-size:22px;
-  font-weight:800;
-  display:flex;
-  align-items:center;
-  gap:8px;
-  box-shadow:0 8px 20px rgba(0,0,0,.25);
-  pointer-events:none;
+  position:absolute;top:16px;left:50%;transform:translateX(-50%);
+  background:rgba(255,255,255,0.2);backdrop-filter:blur(10px);
+  padding:10px 20px;border-radius:30px;color:white;font-size:22px;font-weight:800;
+  display:flex;align-items:center;gap:8px;box-shadow:0 8px 20px rgba(0,0,0,.25);pointer-events:none;
 }
-
 .overlay{
-  position:absolute;
-  inset:0;
-  background:rgba(255,182,193,.95);
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  color:white;
-  text-align:center;
+  position:absolute;inset:0;background:rgba(255,182,193,.95);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;text-align:center;
 }
-
 button{
-  padding:14px 28px;
-  border:none;
-  border-radius:30px;
-  font-size:18px;
-  background:white;
-  color:#ff2f92;
-  margin-top:20px;
+  padding:14px 28px;border:none;border-radius:30px;font-size:18px;background:white;color:#ff2f92;margin-top:20px;
 }
 </style>
 </head>
-
 <body>
-
 <canvas id="game"></canvas>
 <div id="ui">❤️ <span id="score">0</span></div>
 
 <div id="start" class="overlay">
-  <h1>🎂 عيد ميلاد سعيد ❤️</h1
-                            <p>Swipe to play</p>
-
-  <button onclick="startGame()">Start</button>
+  <h1>🎂 عيد ميلاد سعيد فرح ❤️</h1>
+  <p>اسحبي لتلعبي</p>
+  <button onclick="startGame()">ابدئي اللعب</button>
 </div>
 
 <div id="messageBox" class="overlay" style="display:none">
   <h2 id="msgText"></h2>
-  <button onclick="resumeGame()">Resume</button>
+  <button onclick="resumeGame()">استمري</button>
 </div>
 
 <div id="end" class="overlay" style="display:none">
-  <h1>🎉كل عام وأنتِ فرح أيامي، وأتمنى يومًا أن أقول لكِ بكل يقين: اخترتك شريكة حياتي، واختيار القلب لا يخطئ. 🎉</h1>
-  <button onclick="location.reload()">Play Again</button>
+  <h1>🎉 عيد ميلاد سعيد فرح 🎉</h1>
+  <p>100 نقطة، كلها لكِ ❤️</p>
+  <button onclick="location.reload()">العب مرة أخرى</button>
 </div>
 
 <audio id="bgm" src="music.mp3" loop preload="auto" playsinline></audio>
 
 <script>
-/* ================= SETUP ================= */
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
-function resize(){canvas.width=innerWidth;canvas.height=innerHeight}
+function resize(){canvas.width=innerWidth;canvas.height=innerHeight;}
 resize();addEventListener("resize",resize);
 
-/* ================= BACKGROUND ================= */
 const bgImg=new Image();
+let bgReady=false;
+bgImg.onload=()=>bgReady=true;
+bgImg.onerror=()=>{console.error("bg.png failed to load"); bgReady=false;};
 bgImg.src="bg.jpg";
 
-/* ================= STATE ================= */
 let playing=false,paused=false,score=0,shake=0;
 const lanes=[-0.28,0,0.28];
 let lanePos=1,targetLane=1;
-
 const player={y:0,vy:0,baseSize:60,sliding:false,slideTimer:0,wave:0};
 const gravity=0.9,speed=7;
 const items=[],particles=[],confetti=[];
-
-/* ================= AUDIO ================= */
 const bgm=document.getElementById("bgm");
 bgm.volume=0.3;
 
-/* ================= SPAWN ================= */
+const messages=[
+  {score:10,text:"في يوم ميلادك أودّ أن أخبرك أن وجودك في حياتي نعمة أحمد الله عليها كل يوم، وكل عام وأنتِ أقرب لقلبي من أي شيء.",shown:false},
+  {score:20,text:"أنتِ تجعلين كل شيء أجمل 🌸",shown:false},
+  {score:30,text:"لثامن عشر من ديسمبر ليس مجرد تاريخ، بل يوم اختارت فيه الحياة أن تكون أجمل حين وُلدتِ أنتِ.🌸",shown:false},
+  {score:40,text:"كبرتِ عامًا يا فرح، لكن في روحك صفاء لا يكبر، ودفء لا يتغيّر، ونور يزداد بهاءً مع الأيام.🌸",shown:false},
+  {score:50,text:"لم أحبك لأنك مثالية، بل أحببتك لأنك صادقة، لأنك كما أنتِ، ولأن في حضورك سلامًا يطمئن القلب.🌸",shown:false},
+  {score:60,text:"أنا محظوظ جدًا بكِ 💕",shown:false},
+  {score:70,text:"في عينيك طمأنينة، وفي صوتك أمان، ومعك أشعر أن العالم مهما اشتدّ، يصبح ألين.",shown:false},
+  {score:80,text:"فرح، لستِ مجرد ذكرى جميلة في حياتي، بل حلم أتمسك به، ومستقبل أرجو أن يكون لكِ فيه مكان القلب والبيت معًا.",shown:false},
+  {score:90,text:"وأنتِ اليوم في عامك الحادي والعشرين، أتمنى أن أكون الشخص الذي يشاركك السنوات القادمة، فرحها وتعبها، نجاحها وتفاصيلها الصغيرة.",shown:false}
+];
+
+function showMessage(text){
+  document.getElementById("msgText").textContent=text;
+  messageBox.style.display="flex";
+  paused=true;
+  bgm.pause();
+}
+
+function checkMessages(){
+  messages.forEach(msg=>{
+    if(!msg.shown && score >= msg.score){
+      msg.shown=true;
+      showMessage(msg.text);
+      spawnConfetti(30);
+    }
+  });
+}
+
 function spawnItem(){
   const r=Math.random();
   let type="heart";
@@ -119,7 +105,6 @@ function spawnItem(){
 }
 setInterval(()=>{if(playing&&!paused)spawnItem()},900);
 
-/* ================= DRAW KITTY ================= */
 function drawKitty(x,y){
   ctx.save();
   ctx.translate(x,y);
@@ -166,90 +151,101 @@ function drawKitty(x,y){
   ctx.restore();
 }
 
-/* ================= EXPLOSION ================= */
 function bombExplosion(x,y){
   shake=15;
   for(let i=0;i<30;i++){
-    particles.push({
-      x,y,
-      vx:(Math.random()-.5)*8,
-      vy:(Math.random()-.5)*8,
-      life:30
-    });
+    particles.push({x,y,vx:(Math.random()-.5)*8,vy:(Math.random()-.5)*8,life:30,color:"orange"});
   }
 }
 
-/* ================= LOOP ================= */
+function spawnPickupParticles(x,y,color="gold"){
+  for(let i=0;i<15;i++){
+    particles.push({x,y,vx:(Math.random()-.5)*4,vy:(Math.random()-.5)*4,life:25+Math.random()*10,color});
+  }
+}
+
+function spawnConfetti(count){
+  for(let i=0;i<count;i++){
+    confetti.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,vy:2+Math.random()*2,c:`hsl(${Math.random()*360},100%,70%)`});
+  }
+}
+
 function loop(){
   if(!playing)return;
   requestAnimationFrame(loop);
   if(paused)return;
 
-  if(shake>0){shake--;}
+  if(shake>0)shake--;
   ctx.save();
-  ctx.translate(
-    shake?Math.random()*6-3:0,
-    shake?Math.random()*6-3:0
-  );
+  ctx.translate(shake?Math.random()*6-3:0,shake?Math.random()*6-3:0);
 
-  // BG cover
-  const imgRatio=bgImg.width/bgImg.height;
-  const scrRatio=canvas.width/canvas.height;
-  let w,h;
-  if(imgRatio>scrRatio){
-    h=canvas.height; w=h*imgRatio;
-  }else{
-    w=canvas.width; h=w/imgRatio;
+  // Background
+if (bgReady) {
+  const imgRatio = bgImg.width / bgImg.height;
+  const scrRatio = canvas.width / canvas.height;
+  let w, h;
+
+  if (imgRatio > scrRatio) {
+    h = canvas.height;
+    w = h * imgRatio;
+  } else {
+    w = canvas.width;
+    h = w / imgRatio;
   }
-  ctx.drawImage(bgImg,(canvas.width-w)/2,(canvas.height-h)/2,w,h);
 
-  ctx.fillStyle="#fff";
-  ctx.fillRect(0,canvas.height-90,canvas.width,90);
+  ctx.drawImage(
+    bgImg,
+    (canvas.width - w) / 2,
+    (canvas.height - h) / 2,
+    w,
+    h
+  );
+}else{
+    ctx.fillStyle="#aee7ff";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+  }
 
   lanePos+=(targetLane-lanePos)*0.12;
   const px=canvas.width/2+lanes[Math.round(lanePos)]*canvas.width;
 
   player.vy+=gravity;
   player.y+=player.vy;
-  if(player.y>canvas.height-150){
-    player.y=canvas.height-150;
-    player.vy=0;
-  }
+  if(player.y>canvas.height-150){player.y=canvas.height-150;player.vy=0;}
 
-  if(player.sliding){
-    player.slideTimer--;
-    if(player.slideTimer<=0)player.sliding=false;
-  }
+  if(player.sliding){player.slideTimer--; if(player.slideTimer<=0)player.sliding=false;}
 
   drawKitty(px,player.y);
 
+  const hitY=player.sliding?30:50;
   items.forEach((it,i)=>{
     it.y+=speed;
     const ix=canvas.width/2+lanes[it.lane]*canvas.width;
     ctx.font="32px serif";
-    ctx.fillText(
-      {heart:"❤️",flower:"🌸",ring:"💎",bomb:"💣"}[it.type],
-      ix-16,it.y
-    );
+    ctx.fillText({heart:"❤️",flower:"🌸",ring:"💎",bomb:"💣"}[it.type],ix-16,it.y);
 
-    const hitY=player.sliding?30:50;
     if(it.lane===Math.round(lanePos)&&it.y>player.y-hitY&&it.y<player.y+40){
       items.splice(i,1);
       let delta={heart:1,flower:2,ring:3,bomb:-3}[it.type];
       score=Math.max(0,score+delta);
-      scoreEl.textContent=score;
+      document.getElementById("score").textContent=score;
 
-      if(delta>0){player.wave=20;}
-      else{bombExplosion(ix,it.y);}
+      if(delta>0){
+        player.wave=20;
+        if(it.type==="flower") spawnPickupParticles(ix,it.y,"pink");
+        if(it.type==="ring") spawnPickupParticles(ix,it.y,"deepskyblue");
+      }else bombExplosion(ix,it.y);
+
+      checkMessages();
 
       navigator.vibrate?.(delta>0?30:120);
       if(score>=100)endGame();
     }
   });
 
+  // Particles
   particles.forEach((p,i)=>{
-    p.x+=p.vx; p.y+=p.vy; p.life--;
-    ctx.fillStyle="orange";
+    p.x+=p.vx;p.y+=p.vy;p.life--;
+    ctx.fillStyle=p.color||"orange";
     ctx.fillRect(p.x,p.y,4,4);
     if(p.life<=0)particles.splice(i,1);
   });
@@ -257,20 +253,19 @@ function loop(){
   ctx.restore();
 }
 
-/* ================= END CONFETTI ================= */
 function confettiLoop(){
-  if(!end.style.display)return;
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  confetti.forEach(c=>{
-    c.y+=c.vy;
-    ctx.fillStyle=c.c;
-    ctx.fillRect(c.x,c.y,6,6);
-    if(c.y>canvas.height)c.y=-10;
-  });
-  requestAnimationFrame(confettiLoop);
+  if(end.style.display==="flex"){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    confetti.forEach(c=>{
+      c.y+=c.vy;
+      ctx.fillStyle=c.c;
+      ctx.fillRect(c.x,c.y,6,6);
+      if(c.y>canvas.height)c.y=-10;
+    });
+    requestAnimationFrame(confettiLoop);
+  }
 }
 
-/* ================= FLOW ================= */
 function startGame(){
   start.style.display="none";
   player.y=canvas.height-150;
@@ -278,32 +273,24 @@ function startGame(){
   bgm.play().catch(()=>{});
   loop();
 }
+
 function resumeGame(){
   paused=false;
   bgm.play().catch(()=>{});
   messageBox.style.display="none";
 }
+
 function endGame(){
   playing=false;
   bgm.pause();
   end.style.display="flex";
-  for(let i=0;i<100;i++){
-    confetti.push({
-      x:Math.random()*canvas.width,
-      y:Math.random()*canvas.height,
-      vy:2+Math.random()*3,
-      c:`hsl(${Math.random()*360},100%,70%)`
-    });
-  }
+  spawnConfetti(100);
   confettiLoop();
 }
 
-/* ================= TOUCH ================= */
+// Touch controls
 let sx=0,sy=0;
-addEventListener("touchstart",e=>{
-  sx=e.touches[0].clientX;
-  sy=e.touches[0].clientY;
-});
+addEventListener("touchstart",e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY;});
 addEventListener("touchend",e=>{
   const dx=e.changedTouches[0].clientX-sx;
   const dy=e.changedTouches[0].clientY-sy;
@@ -312,17 +299,9 @@ addEventListener("touchend",e=>{
     if(dx<-40&&targetLane>0)targetLane--;
   }else{
     if(dy<-40&&player.vy===0)player.vy=-18;
-    if(dy>40&&!player.sliding){
-      player.sliding=true;
-      player.slideTimer=25;
-    }
+    if(dy>40&&!player.sliding){player.sliding=true;player.slideTimer=25;}
   }
 });
-
-const scoreEl=document.getElementById("score");
 </script>
-
 </body>
 </html>
-
-
